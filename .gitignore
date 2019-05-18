@@ -1,0 +1,12 @@
+.vs/EventNext/v15/
+src/bin/
+src/obj/
+src/Properties/
+samples/BaseUsing/bin/
+samples/BaseUsing/obj/
+samples/EventNext_AkkaNet/Properties/
+samples/EventNext_AkkaNet/bin/
+samples/EventNext_AkkaNet/obj/
+samples/Performance/Properties/
+samples/Performance/bin/
+samples/Performance/obj/
