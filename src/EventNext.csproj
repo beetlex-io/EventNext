@@ -1,0 +1,18 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netcoreapp2.1</TargetFramework>
+    <Description>EventNext is logic interface design on event driven components  for .net core</Description>
+    <Version>0.2.2</Version>
+    <Authors>henryfan</Authors>
+    <Company>ikende.com</Company>
+    <Copyright>Copyright © ikende.com 2019 email:henryfan@msn.com</Copyright>
+    <PackageLicenseUrl>https://github.com/IKende/EventNext/blob/master/LICENSE</PackageLicenseUrl>
+    <PackageProjectUrl>https://github.com/IKende/EventNext</PackageProjectUrl>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="OutputAwaiterFactory.cs" />
+  </ItemGroup>
+
+</Project>
