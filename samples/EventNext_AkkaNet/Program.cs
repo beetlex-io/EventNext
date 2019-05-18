@@ -12,9 +12,13 @@ namespace EventNext_AkkaNet
 
         private static ActorSystem Akka;
 
+        private static IActorRef henryActor;
+
+        private static IActorRef nbActor;
+
         private static int mCount;
 
-        private static int mRequests = 100;
+        private static int[] mConcurrent = new int[] { 10, 20, 50, 100, 200, 500 };
 
         private static int mFors = 10000;
 
@@ -27,32 +31,34 @@ namespace EventNext_AkkaNet
                 Console.WriteLine($"[{e.Type}]{e.Message}");
             };
             Akka = ActorSystem.Create("MySystem");
+            henryActor = Akka.ActorOf<UserActor>("henry");
+            nbActor = Akka.ActorOf<UserActor>("nb");
             Test();
             Console.Read();
         }
 
         static async void Test()
         {
-            await AkkaTest();
-            await EventNextTest();
+            foreach (var c in mConcurrent)
+            {
+                await AkkaTest(c);
+                await EventNextTest(c);
+            }
         }
 
-        static async Task AkkaTest()
+        static async Task AkkaTest(int concurrent)
         {
             mCount = 0;
-            var henry = Akka.ActorOf<UserActor>("henry");
-            var nb = Akka.ActorOf<UserActor>("nb");
-            double start = EventCenter.Watch.ElapsedMilliseconds;
-
+            long start = EventCenter.Watch.ElapsedMilliseconds;
             List<Task> tasks = new List<Task>();
-            for (int k = 0; k < mRequests; k++)
+            for (int k = 0; k < concurrent; k++)
             {
                 var task = Task.Run(async () =>
                 {
                     for (int i = 0; i < mFors; i++)
                     {
                         Income income = new Income { Memory = i };
-                        var result = await henry.Ask<decimal>(income);
+                        var result = await henryActor.Ask<decimal>(income);
                         System.Threading.Interlocked.Increment(ref mCount);
                     }
                 });
@@ -63,7 +69,7 @@ namespace EventNext_AkkaNet
                     for (int i = 0; i < mFors; i++)
                     {
                         Payout payout = new Payout { Memory = i };
-                        var result = await henry.Ask<decimal>(payout);
+                        var result = await henryActor.Ask<decimal>(payout);
                         System.Threading.Interlocked.Increment(ref mCount);
                     }
                 });
@@ -75,7 +81,7 @@ namespace EventNext_AkkaNet
                     for (int i = 0; i < mFors; i++)
                     {
                         Income income = new Income { Memory = i };
-                        var result = await nb.Ask<decimal>(income);
+                        var result = await nbActor.Ask<decimal>(income);
                         System.Threading.Interlocked.Increment(ref mCount);
                     }
                 });
@@ -86,7 +92,7 @@ namespace EventNext_AkkaNet
                     for (int i = 0; i < mFors; i++)
                     {
                         Payout payout = new Payout { Memory = i };
-                        var result = await nb.Ask<decimal>(payout);
+                        var result = await nbActor.Ask<decimal>(payout);
                         System.Threading.Interlocked.Increment(ref mCount);
                     }
                 });
@@ -96,19 +102,20 @@ namespace EventNext_AkkaNet
             }
             Task.WaitAll(tasks.ToArray());
             var get = new Get();
-            var henryAmount = await henry.Ask<decimal>(get);
-            var nbAmount = await nb.Ask<decimal>(get);
-            Console.WriteLine($"Akka use time:{EventCenter.Watch.ElapsedMilliseconds - start}|count:{mCount}|henry:{henryAmount}|nb:{nbAmount}");
+            var henryAmount = await henryActor.Ask<decimal>(get);
+            var nbAmount = await nbActor.Ask<decimal>(get);
+            long usetime = EventCenter.Watch.ElapsedMilliseconds - start;
+            Console.WriteLine($"Akka concurrent{concurrent}|use time:{EventCenter.Watch.ElapsedMilliseconds - start}|count:{mCount}|rps:{mCount / usetime * 1000}|henry:{henryAmount}|nb:{nbAmount}");
         }
 
-        static async Task EventNextTest()
+        static async Task EventNextTest(int concurrent)
         {
             mCount = 0;
             IUserService henry = EventCenter.Create<IUserService>("henry"); ;
             IUserService nb = EventCenter.Create<IUserService>("nb"); ;
-            double start = EventCenter.Watch.ElapsedMilliseconds;
+            long start = EventCenter.Watch.ElapsedMilliseconds;
             List<Task> tasks = new List<Task>();
-            for (int k = 0; k < mRequests; k++)
+            for (int k = 0; k < concurrent; k++)
             {
                 var task = Task.Run(async () =>
                 {
@@ -156,7 +163,8 @@ namespace EventNext_AkkaNet
             Task.WaitAll(tasks.ToArray());
             var henryAmount = await henry.Amount();
             var nbAmount = await nb.Amount();
-            Console.WriteLine($"EventNext use time:{EventCenter.Watch.ElapsedMilliseconds - start}|count:{mCount}|henry:{henryAmount}|nb:{nbAmount}");
+            long usetime = EventCenter.Watch.ElapsedMilliseconds - start;
+            Console.WriteLine($"EventNext concurrent{concurrent} use time:{usetime}|count:{mCount}|rps:{mCount / usetime * 1000}|henry:{henryAmount}|nb:{nbAmount}");
         }
     }
 }

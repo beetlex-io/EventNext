@@ -12,8 +12,6 @@ namespace BaseUsing
 
         private static IUserService nb;
 
-        private static int mCount;
-
         static void Main(string[] args)
         {
             EventCenter.Register(typeof(Program).Assembly);
@@ -40,35 +38,29 @@ namespace BaseUsing
         }
     }
 
+    public interface IUserService
+    {
+        Task<int> Income(int value);
+
+        Task<int> Payout(int value);
+
+        Task<int> Amount();
+    }
 
     [Service(typeof(IUserService))]
-    public class UserService : IUserService, IActorState
+    public class UserService : IUserService
     {
-        private int mAmount;
-
-        public string Path { get; set; }
-
-        public EventCenter EventCenter { get; set; }
+        private int mAmount;   
 
         public Task<int> Amount()
         {
             return Task.FromResult(mAmount);
         }
 
-        public void Flush()
-        {
-            Console.WriteLine($"{Path} flush");
-        }
-
         public Task<int> Income(int value)
         {
             mAmount += value;
             return Task.FromResult(mAmount);
-        }
-
-        public void Init()
-        {
-            Console.WriteLine($"{Path} init");
         }
 
         public Task<int> Payout(int value)
@@ -78,15 +70,5 @@ namespace BaseUsing
         }
     }
 
-    public interface IUserService
-    {
 
-
-        Task<int> Income(int value);
-
-        Task<int> Payout(int value);
-
-        Task<int> Amount();
-
-    }
 }
