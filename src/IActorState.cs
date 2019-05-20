@@ -8,7 +8,9 @@ namespace EventNext
     {
         string Path { get; set; }
 
-        void Init();
+        void Init(string id);
+
+        object Token { get; set; }
 
         EventCenter EventCenter { get; set; }
 

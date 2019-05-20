@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>netcoreapp2.1</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="EventNext" Version="0.2.6" />
+    <PackageReference Include="Peanut" Version="1.0.8.2" />
+    <PackageReference Include="System.Data.SQLite.Core" Version="1.0.110" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Users.db">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>

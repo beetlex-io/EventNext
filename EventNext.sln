@@ -13,6 +13,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EventNext_AkkaNet", "sample
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BaseUsing", "samples\BaseUsing\BaseUsing.csproj", "{40882DDF-6FF0-45B9-BBBA-C8E807E1A82E}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SqlietUserAmount", "samples\SqlietUserAmount\SqlietUserAmount.csproj", "{B4E64C2D-276F-4CC9-B4C9-1BAF361CABDF}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -35,6 +37,10 @@ Global
 		{40882DDF-6FF0-45B9-BBBA-C8E807E1A82E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{40882DDF-6FF0-45B9-BBBA-C8E807E1A82E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{40882DDF-6FF0-45B9-BBBA-C8E807E1A82E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B4E64C2D-276F-4CC9-B4C9-1BAF361CABDF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B4E64C2D-276F-4CC9-B4C9-1BAF361CABDF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B4E64C2D-276F-4CC9-B4C9-1BAF361CABDF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B4E64C2D-276F-4CC9-B4C9-1BAF361CABDF}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -43,6 +49,7 @@ Global
 		{0C3957F7-F2EE-472D-994E-89DB994A938E} = {4B7663C5-10FC-4CE6-B5B9-2452669F0349}
 		{3AB19317-42E0-477A-B8D7-3842F18EC1F6} = {4B7663C5-10FC-4CE6-B5B9-2452669F0349}
 		{40882DDF-6FF0-45B9-BBBA-C8E807E1A82E} = {4B7663C5-10FC-4CE6-B5B9-2452669F0349}
+		{B4E64C2D-276F-4CC9-B4C9-1BAF361CABDF} = {4B7663C5-10FC-4CE6-B5B9-2452669F0349}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {F48908E0-F39B-4E96-8799-019CA436E575}

@@ -28,9 +28,9 @@ namespace EventNext
 
         private ConcurrentDictionary<string, EventActionHandler> mActionHadlers = new ConcurrentDictionary<string, EventActionHandler>();
 
-        private Dictionary<Type, ActorProxy> mActorProxyMap = new Dictionary<Type, ActorProxy>();
+        private ConcurrentDictionary<Type, ActorProxy> mActorProxyMap = new ConcurrentDictionary<Type, ActorProxy>();
 
-        private Dictionary<Type, ServiceCollection> mServiceCollection = new Dictionary<Type, ServiceCollection>();
+        private ConcurrentDictionary<Type, ServiceCollection> mServiceCollection = new ConcurrentDictionary<Type, ServiceCollection>();
 
         private ConcurrentDictionary<string, Object> mProperties = new ConcurrentDictionary<string, object>();
 
@@ -249,7 +249,7 @@ namespace EventNext
                             {
                                 state.Path = actorPath;
                                 state.EventCenter = this;
-                                state.Init();
+                                state.Init(actorID);
                                 if (EnabledLog(LogType.Debug))
                                     Log(LogType.Debug, $"create {handler.ControllerType.Name}@{actorPath} actor initialized");
                             }

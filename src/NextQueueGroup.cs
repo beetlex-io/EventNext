@@ -26,7 +26,7 @@ namespace EventNext
         {
             for (int i = 0; i < mQueues.Count; i++)
             {
-                if (mQueues[i].Count < 5)
+                if (mQueues[i].Count < waitLength)
                 {
                     mQueues[i].Enqueue(item);
                     return;
