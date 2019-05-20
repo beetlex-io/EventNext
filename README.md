@@ -1,5 +1,5 @@
 # EventNext
-EventNext is logic interface design on event driven components  for .net core
+EventNext is logic interface design in event driven components  for .net core
 
 ## Install
 ```
