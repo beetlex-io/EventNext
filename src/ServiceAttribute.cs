@@ -18,6 +18,7 @@ namespace EventNext
 
         public bool SingleInstance { get; set; } = true;
     }
+
     [AttributeUsage(AttributeTargets.Method)]
     public class ActionAttribute : Attribute
     {

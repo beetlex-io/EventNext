@@ -16,14 +16,13 @@ namespace EventNext
             Watch.Start();
         }
 
-        public string ACTOR_TAG = "ACTOR";
+        public const string ACTOR_TAG = "ACTOR";
 
         public const string ACTOR_NULL_TAG = "___NULL_ACTOR";
 
         public EventCenter()
         {
             LogType = LogType.Error;
-
         }
 
         private ConcurrentDictionary<string, EventActionHandler> mActionHadlers = new ConcurrentDictionary<string, EventActionHandler>();
@@ -210,6 +209,7 @@ namespace EventNext
                 input.ID = GetInputID();
             double runTime = Watch.Elapsed.TotalMilliseconds;
             EventOutput output = new EventOutput();
+            output.Token = input.Token;
             output.ID = input.ID;
             try
             {
@@ -222,7 +222,6 @@ namespace EventNext
                 }
                 else
                 {
-
                     var actorID = input.Properties?[ACTOR_TAG];
                     string actorPath = null;
                     object controller = null;
@@ -244,14 +243,23 @@ namespace EventNext
                                 Log(LogType.Debug, $"create {handler.ControllerType.Name}@{actorPath} actor");
                             controller = CreateController(handler.ServiceCollection.ServiceType);
                             handler.ServiceCollection.Set(actorID, controller);
-                            IActorState state = controller as IActorState;
-                            if (state != null)
+                            if (controller is IActorState state)
                             {
-                                state.Path = actorPath;
+                                state.ActorPath = actorPath;
                                 state.EventCenter = this;
+                                state.EventPath = input.EventPath;
+                                state.Token = input.Token;
                                 state.Init(actorID);
                                 if (EnabledLog(LogType.Debug))
                                     Log(LogType.Debug, $"create {handler.ControllerType.Name}@{actorPath} actor initialized");
+                            }
+                        }
+                        else
+                        {
+                            if (controller is IActorState state)
+                            {
+                                state.EventPath = input.EventPath;
+                                state.Token = input.Token;
                             }
                         }
                     }
@@ -356,14 +364,14 @@ namespace EventNext
                         state.Flush();
                         if (EnabledLog(LogType.Debug))
                         {
-                            Log(LogType.Debug, $"Flash {state.Path} success");
+                            Log(LogType.Debug, $"Flash {state.EventPath} success");
                         }
                     }
                     catch (Exception e_)
                     {
                         if (EnabledLog(LogType.Error))
                         {
-                            Log(LogType.Error, $"Flash {state.Path} error {e_.Message}@{e_.StackTrace}");
+                            Log(LogType.Error, $"Flash {state.EventPath} error {e_.Message}@{e_.StackTrace}");
                         }
                     }
                 }
@@ -375,5 +383,12 @@ namespace EventNext
             mActionHadlers.Clear();
             mActorProxyMap.Clear();
         }
+
+        public Task WriteEvent(IActorState actor, string eventid, string parentEventid, object data)
+        {
+            return EventLogHandler?.Write(actor, new EventLog { Data = data, DateTime = DateTime.Now, ActorPath = actor.ActorPath, EventPath = actor.EventPath, EventID = eventid, ParentEventID = parentEventid });
+        }
+
+        public IEventLogHandler EventLogHandler { get; set; }
     }
 }

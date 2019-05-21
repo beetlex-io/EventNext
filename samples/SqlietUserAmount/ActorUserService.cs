@@ -8,10 +8,13 @@ namespace SqlietUserAmount
     [Service(typeof(IUserService))]
     public class ActorUserService : IUserService, IActorState
     {
-        public string Path { get; set; }
+        public string EventPath { get; set; }
 
         public EventCenter EventCenter { get; set; }
+
         public object Token { get; set; }
+
+        public string ActorPath { get; set; }
 
         private User user;
 
@@ -25,21 +28,25 @@ namespace SqlietUserAmount
             return Task.FromResult(user.Amount);
         }
 
-        public Task<long> Income(int amount)
-        {
-            user.Amount += amount;
-            return Task.FromResult(user.Amount);
-        }
-
         public void Init(string id)
         {
             user = (User.name == id).ListFirst<User>();
         }
 
-        public Task<long> Pay(int amount)
+        public async Task<long> Income(int amount)
         {
+            await EventCenter.WriteEvent(this, null, null, new { History = user.Amount, Change = amount, Value = user.Amount + amount });
+            user.Amount += amount;
+            return user.Amount;
+        }
+
+
+
+        public async Task<long> Pay(int amount)
+        {
+            await EventCenter.WriteEvent(this, null, null, new { History = user.Amount, Change = -amount, Value = user.Amount - amount });
             user.Amount -= amount;
-            return Task.FromResult(user.Amount);
+            return user.Amount;
         }
     }
 
@@ -51,6 +58,22 @@ namespace SqlietUserAmount
 
         Task<long> GetAmount();
 
+    }
+
+    public class SqliteEventStore : EventNext.IEventLogHandler
+    {
+        public Task<string> Write(IActorState actor, EventLog log)
+        {
+            EventStore store = new EventStore();
+            store.EventID = log.EventID ?? Guid.NewGuid().ToString("N");
+            store.ParentEventID = log.ParentEventID;
+            store.DateTime = log.DateTime;
+            store.EventPath = log.EventPath;
+            store.ActorPath = log.ActorPath;
+            store.Log = Newtonsoft.Json.JsonConvert.SerializeObject(log.Data);
+            store.Save();
+            return Task.FromResult(store.EventID);
+        }
     }
 
 }

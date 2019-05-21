@@ -6,9 +6,22 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="EventNext" Version="0.2.6" />
+    <PackageReference Include="EventNext" Version="0.3.2" />
+    <PackageReference Include="Newtonsoft.Json" Version="12.0.2" />
     <PackageReference Include="Peanut" Version="1.0.8.2" />
     <PackageReference Include="System.Data.SQLite.Core" Version="1.0.110" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="User.cs">
+      <Generator>Peanut</Generator>
+      <LastGenOutput>User.Model.cs</LastGenOutput>
+    </Compile>
+    <Compile Update="User.Model.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>User.cs</DependentUpon>
+    </Compile>
   </ItemGroup>
 
   <ItemGroup>

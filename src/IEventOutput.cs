@@ -17,6 +17,8 @@ namespace EventNext
         EventError EventError { get; set; }
 
         double ResponseTime { get; }
+
+        object Token { get; set; }
     }
 
     public class EventOutput : IEventOutput
@@ -32,6 +34,8 @@ namespace EventNext
         public EventError EventError { get; set; }
 
         public double ResponseTime { get; internal set; }
+
+        public object Token { get; set; }
     }
 
 }

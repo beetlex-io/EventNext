@@ -6,7 +6,9 @@ namespace EventNext
 {
     public interface IActorState
     {
-        string Path { get; set; }
+        string EventPath { get; set; }
+
+        string ActorPath { get; set; }
 
         void Init(string id);
 

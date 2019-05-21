@@ -13,6 +13,8 @@ namespace EventNext
         Dictionary<string, string> Properties { get; set; }
 
         object[] Data { get; set; }
+
+        object Token { get; set; }
     }
 
     public class EventInput : IEventInput
@@ -25,5 +27,7 @@ namespace EventNext
         public Dictionary<string, string> Properties { get; set; }
 
         public object[] Data { get; set; }
+
+        public object Token { get; set; }
     }
 }

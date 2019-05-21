@@ -12,6 +12,5 @@ namespace EventNext
         TimeOut = 408,
         NotSupport = 403,
         NotFound = 404
-
     }
 }
