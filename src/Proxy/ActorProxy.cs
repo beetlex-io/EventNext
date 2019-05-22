@@ -4,7 +4,7 @@ using System.Text;
 
 namespace EventNext.Proxy
 {
-    public class ActorProxy
+    public class ActorProxyCollection
     {
         private Dictionary<string, EventDispatchProxy> mActor = new Dictionary<string, EventDispatchProxy>();
 

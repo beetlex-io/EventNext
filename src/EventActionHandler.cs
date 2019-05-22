@@ -68,7 +68,7 @@ namespace EventNext
             }
         }
 
-        internal ServiceCollection ServiceCollection { get; set; }
+        internal ActorCollection Actors { get; set; }
 
     }
 }

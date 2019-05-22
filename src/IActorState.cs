@@ -18,4 +18,26 @@ namespace EventNext
 
         void Flush();
     }
+
+    public abstract class ActorState : IActorState
+    {
+        public string EventPath { get; set; }
+
+        public string ActorPath { get; set; }
+
+        public object Token { get; set; }
+
+        public EventCenter EventCenter { get; set; }
+
+        public virtual void Flush()
+        {
+
+        }
+
+        public virtual void Init(string id)
+        {
+
+        }
+    }
+
 }

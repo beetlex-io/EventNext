@@ -11,7 +11,6 @@ namespace EventNext.Proxy
     {
         public EventDispatchProxy()
         {
-            ActorNextQueue.Unused = OnActorFlush;
         }
 
         private Dictionary<string, ActionHandlerProxy> mHandlers = new Dictionary<string, ActionHandlerProxy>();
@@ -96,13 +95,13 @@ namespace EventNext.Proxy
                 if (Actor == EventCenter.ACTOR_NULL_TAG)
                 {
                     if (EventCenter.EnabledLog(LogType.Debug))
-                        EventCenter.Log(LogType.Debug, $"executing {input.EventPath}@{input.ID}");
-                    EventCenter.InputNextQueue.Enqueue(inputWork);
+                        EventCenter.Log(LogType.Debug, $"{input.Token} {Type.Name} proxy executing {input.EventPath}");
+                    EventCenter.InputNextQueue.Enqueue(inputWork, EventCenter.NextQueueWaits);
                 }
                 else
                 {
                     if (EventCenter.EnabledLog(LogType.Debug))
-                        EventCenter.Log(LogType.Debug, $"executing {input.EventPath}@{input.ID} in {Type.Name}{Actor}");
+                        EventCenter.Log(LogType.Debug, $"{input.Token} {Type.Name} proxy executing {input.EventPath} in {Type.Name}/{Actor} actor");
                     ActorNextQueue.Enqueue(inputWork);
                 }
                 return task.GetTask();
@@ -111,8 +110,8 @@ namespace EventNext.Proxy
 
         protected void OnEventInvoke(IAnyCompletionSource e, IEventInput input, IEventOutput output)
         {
-            ProxyOutputWork resultWork = new ProxyOutputWork { CompletionSource = e, EventCenter = EventCenter, Input = input, Output = output };
-            EventCenter.OutputNextQueue.Enqueue(resultWork);
+            ProxyOutputWork resultWork = new ProxyOutputWork { CompletionSource = e, EventCenter = EventCenter, Input = input, Output = output, EventDispatchProxy = this };
+            EventCenter.OutputNextQueue.Enqueue(resultWork,EventCenter.NextQueueWaits);
         }
 
         class ProxyOutputWork : IEventWork
@@ -121,6 +120,8 @@ namespace EventNext.Proxy
             {
 
             }
+
+            public EventDispatchProxy EventDispatchProxy { get; set; }
 
             public IEventInput Input { get; set; }
 
@@ -135,7 +136,7 @@ namespace EventNext.Proxy
                 if (Output.EventError != EventError.Success)
                 {
                     if (EventCenter.EnabledLog(LogType.Debug))
-                        EventCenter.Log(LogType.Debug, $"execute {Input.EventPath}@{Input.ID} error {(string)Output.Data[0]}");
+                        EventCenter.Log(LogType.Debug, $"{Input.Token} {EventDispatchProxy.Type.Name} proxy execute {Input.EventPath} error {(string)Output.Data[0]}");
                     ENException exception = new ENException((string)Output.Data[0]);
                     exception.EventError = Output.EventError;
                     CompletionSource.Error(exception);
@@ -143,7 +144,7 @@ namespace EventNext.Proxy
                 else
                 {
                     if (EventCenter.EnabledLog(LogType.Debug))
-                        EventCenter.Log(LogType.Debug, $"execute {Input.EventPath}@{Input.ID} successed!");
+                        EventCenter.Log(LogType.Debug, $"{Input.Token} {EventDispatchProxy.Type.Name} proxy execute {Input.EventPath} successed!");
                     if (Output.Data != null && Output.Data.Length > 0)
                     {
                         CompletionSource.Success(Output.Data[0]);

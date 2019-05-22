@@ -35,7 +35,7 @@ namespace EventNext
 
         public double ResponseTime { get; internal set; }
 
-        public object Token { get; set; }
+        public object Token { get; set; } = "Localhost";
     }
 
 }

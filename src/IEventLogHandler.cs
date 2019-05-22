@@ -8,6 +8,8 @@ namespace EventNext
     public interface IEventLogHandler
     {
         Task<string> Write(IActorState actor, EventLog log);
+
+        Task<EventLog> Read(IActorState actor, string eventid);
     }
 
 }

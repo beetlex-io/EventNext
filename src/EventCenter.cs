@@ -13,6 +13,7 @@ namespace EventNext
         static EventCenter()
         {
             Watch = new System.Diagnostics.Stopwatch();
+
             Watch.Start();
         }
 
@@ -23,13 +24,19 @@ namespace EventNext
         public EventCenter()
         {
             LogType = LogType.Error;
+            ActorFreeTime = 60;
+            mFreeTimer = new System.Threading.Timer(OnFreeActor, null, 1000 * 30, 1000 * 30);
         }
+
+        private long mID = 0;
+
+        private System.Threading.Timer mFreeTimer;
 
         private ConcurrentDictionary<string, EventActionHandler> mActionHadlers = new ConcurrentDictionary<string, EventActionHandler>();
 
-        private ConcurrentDictionary<Type, ActorProxy> mActorProxyMap = new ConcurrentDictionary<Type, ActorProxy>();
+        private ConcurrentDictionary<Type, ActorProxyCollection> mActorProxyMap = new ConcurrentDictionary<Type, ActorProxyCollection>();
 
-        private ConcurrentDictionary<Type, ServiceCollection> mServiceCollection = new ConcurrentDictionary<Type, ServiceCollection>();
+        private ConcurrentDictionary<Type, ActorCollection> mActorsCollection = new ConcurrentDictionary<Type, ActorCollection>();
 
         private ConcurrentDictionary<string, Object> mProperties = new ConcurrentDictionary<string, object>();
 
@@ -44,7 +51,28 @@ namespace EventNext
             return Activator.CreateInstance(type);
         }
 
-        private long mID = 0;
+        private void OnFreeActor(object state)
+        {
+            mFreeTimer.Change(-1, -1);
+            try
+            {
+                foreach (var item in mActorsCollection.Values)
+                {
+                    item.Free(this);
+                }
+            }
+            catch (Exception e_)
+            {
+                if (EnabledLog(LogType.Error))
+                    Log(LogType.Error, $"Timer free actor error {e_.Message}@{e_.StackTrace}");
+            }
+            finally
+            {
+                mFreeTimer.Change(1000 * 30, 1000 * 30);
+            }
+        }
+
+        public int NextQueueWaits { get; set; } = 5;
 
         public virtual long GetInputID()
         {
@@ -59,6 +87,8 @@ namespace EventNext
 
         public LogType LogType { get; set; }
 
+        public int ActorFreeTime { get; set; }
+
         public event EventHandler<Events.EventLogArgs> LogOutput;
 
         public bool EnabledLog(LogType type)
@@ -68,7 +98,14 @@ namespace EventNext
 
         public void Log(LogType logType, string message)
         {
-            LogOutput?.Invoke(this, new Events.EventLogArgs(this, logType, message));
+            try
+            {
+                LogOutput?.Invoke(this, new Events.EventLogArgs(this, logType, message));
+            }
+            catch
+            {
+
+            }
         }
 
         private void OnRegister(ServiceAttribute attribute, Type type, object controller)
@@ -99,11 +136,11 @@ namespace EventNext
                         if (resultType.BaseType == typeof(Task) || resultType == typeof(Task))
                         {
                             Type serviceType = controller.GetType();
-                            if (!mServiceCollection.TryGetValue(serviceType, out ServiceCollection serviceCollection))
+                            if (!mActorsCollection.TryGetValue(serviceType, out ActorCollection serviceCollection))
                             {
-                                serviceCollection = new ServiceCollection(serviceType);
-                                mServiceCollection[serviceType] = serviceCollection;
-                                mServiceCollection[itype] = serviceCollection;
+                                serviceCollection = new ActorCollection(serviceType);
+                                mActorsCollection[serviceType] = serviceCollection;
+                                mActorsCollection[itype] = serviceCollection;
                             }
                             ActionAttribute aa = method.GetCustomAttribute<ActionAttribute>(false);
 
@@ -118,7 +155,7 @@ namespace EventNext
                                 handler.ServiceName = serviceName;
                                 handler.ActionName = (aa == null ? method.Name : aa.Name);
                                 handler.SingleInstance = attribute.SingleInstance;
-                                handler.ServiceCollection = serviceCollection;
+                                handler.Actors = serviceCollection;
                                 handler.Interface = itype;
                                 mActionHadlers[actionUrl] = handler;
                                 Log(LogType.Info, $"Register {itype.Name}->{type.Name}@{method.Name} to {actionUrl}");
@@ -219,6 +256,10 @@ namespace EventNext
                 {
                     output.EventError = EventError.NotFound;
                     output.Data = new object[] { $"Process event error '{input.EventPath}' not found!" };
+                    if (EnabledLog(LogType.Warring))
+                    {
+                        Log(LogType.Warring, $"{input.Token} Process event error '{input.EventPath}' not found!");
+                    }
                 }
                 else
                 {
@@ -227,6 +268,10 @@ namespace EventNext
                     object controller = null;
                     if (string.IsNullOrEmpty(actorID))
                     {
+                        if (EnabledLog(LogType.Debug))
+                        {
+                            Log(LogType.Debug, $"{input.Token} Process event '{input.EventPath}'");
+                        }
                         controller = handler.Controller;
                         if (!handler.SingleInstance)
                         {
@@ -235,14 +280,21 @@ namespace EventNext
                     }
                     else
                     {
-                        controller = handler.ServiceCollection.Get(actorID);
-                        if (controller == null)
+                        ActorCollection.ActorCollectionItem item;
+                        item = handler.Actors.Get(actorID);
+                        if (item == null)
                         {
                             actorPath = "/" + handler.ServiceName + "/" + actorID;
                             if (EnabledLog(LogType.Debug))
-                                Log(LogType.Debug, $"create {handler.ControllerType.Name}@{actorPath} actor");
-                            controller = CreateController(handler.ServiceCollection.ServiceType);
-                            handler.ServiceCollection.Set(actorID, controller);
+                                Log(LogType.Debug, $"{input.Token} {handler.ControllerType.Name}@{actorPath} create actor");
+                            item = new ActorCollection.ActorCollectionItem();
+                            item.ActorID = actorID;
+                            item.Actor = CreateController(handler.Actors.ServiceType);
+                            item.ServiceName = handler.ServiceName;
+                            item.Interface = handler.Interface;
+                            item = handler.Actors.Set(actorID, item);
+                            item.TimeOut = EventCenter.Watch.ElapsedMilliseconds + ActorFreeTime * 1000;
+                            controller = item.Actor;
                             if (controller is IActorState state)
                             {
                                 state.ActorPath = actorPath;
@@ -251,11 +303,13 @@ namespace EventNext
                                 state.Token = input.Token;
                                 state.Init(actorID);
                                 if (EnabledLog(LogType.Debug))
-                                    Log(LogType.Debug, $"create {handler.ControllerType.Name}@{actorPath} actor initialized");
+                                    Log(LogType.Debug, $"{input.Token} {handler.ControllerType.Name}@{actorPath} actor initialized");
                             }
                         }
                         else
                         {
+                            item.TimeOut = EventCenter.Watch.ElapsedMilliseconds + ActorFreeTime * 1000;
+                            controller = item.Actor;
                             if (controller is IActorState state)
                             {
                                 state.EventPath = input.EventPath;
@@ -268,7 +322,12 @@ namespace EventNext
                     if (result != null)
                         output.Data = new object[] { result };
                     if (EnabledLog(LogType.Debug))
-                        Log(LogType.Debug, $"execute {handler.ControllerType.Name}@{handler.ActionName} actor path {actorPath} successed");
+                    {
+                        if (string.IsNullOrEmpty(actorPath))
+                            Log(LogType.Debug, $"{input.Token} Process event {handler.ControllerType.Name}@{handler.ActionName} successed");
+                        else
+                            Log(LogType.Debug, $"{input.Token} Process event in {actorPath} actor invoke {handler.ControllerType.Name}/{handler.ActionName} successed");
+                    }
                 }
             }
             catch (Exception e_)
@@ -276,21 +335,21 @@ namespace EventNext
                 output.EventError = EventError.InnerError;
                 output.Data = new object[] { $"Process event {input.EventPath} error {e_.Message}" };
                 if (EnabledLog(LogType.Error))
-                    Log(LogType.Error, $"Process event {input.EventPath} error {e_.Message}@{e_.StackTrace}");
+                    Log(LogType.Error, $"{input.Token} Process event {input.EventPath} error {e_.Message}@{e_.StackTrace}");
             }
             output.ResponseTime = Watch.Elapsed.TotalMilliseconds - runTime;
             return output;
         }
 
-        private ActorProxy GetActorProxy(Type type)
+        private ActorProxyCollection GetActorProxy(Type type)
         {
-            if (!mActorProxyMap.TryGetValue(type, out ActorProxy actorProxy))
+            if (!mActorProxyMap.TryGetValue(type, out ActorProxyCollection actorProxy))
             {
                 lock (mActorProxyMap)
                 {
                     if (!mActorProxyMap.TryGetValue(type, out actorProxy))
                     {
-                        actorProxy = new ActorProxy();
+                        actorProxy = new ActorProxyCollection();
                         mActorProxyMap[type] = actorProxy;
                     }
                 }
@@ -347,34 +406,16 @@ namespace EventNext
             return CreateActorProxy<T>(actor);
         }
 
-        public void ActorFlush<T>(string actor)
+        public void ActorFlush<T>(string actor = null)
         {
             ActorFlush(typeof(T), actor);
         }
 
         public void ActorFlush(Type type, string actor)
         {
-            if (mServiceCollection.TryGetValue(type, out ServiceCollection service))
+            if (mActorsCollection.TryGetValue(type, out ActorCollection service))
             {
-                var state = service.Get(actor) as IActorState;
-                if (state != null)
-                {
-                    try
-                    {
-                        state.Flush();
-                        if (EnabledLog(LogType.Debug))
-                        {
-                            Log(LogType.Debug, $"Flash {state.EventPath} success");
-                        }
-                    }
-                    catch (Exception e_)
-                    {
-                        if (EnabledLog(LogType.Error))
-                        {
-                            Log(LogType.Error, $"Flash {state.EventPath} error {e_.Message}@{e_.StackTrace}");
-                        }
-                    }
-                }
+                service.Flush(this, actor);
             }
         }
 
@@ -382,13 +423,40 @@ namespace EventNext
         {
             mActionHadlers.Clear();
             mActorProxyMap.Clear();
+            foreach (var item in mActorsCollection.Values)
+            {
+                item.Free(this, true);
+            }
+            mActorsCollection.Clear();
+            if (mFreeTimer != null)
+                mFreeTimer.Dispose();
         }
 
-        public Task WriteEvent(IActorState actor, string eventid, string parentEventid, object data)
+        public Task<EventLog> ReadEvent(IActorState actor, string eventid)
         {
-            return EventLogHandler?.Write(actor, new EventLog { Data = data, DateTime = DateTime.Now, ActorPath = actor.ActorPath, EventPath = actor.EventPath, EventID = eventid, ParentEventID = parentEventid });
+            return EventLogHandler?.Read(actor, eventid);
+        }
+
+        public async Task<string> WriteEvent(IActorState actor, string eventid, string parentEventid, object data)
+        {
+            if (EventLogHandler != null)
+            {
+                var result = await EventLogHandler.Write(actor,
+                    new EventLog { Data = data, DateTime = DateTime.Now, ActorPath = actor.ActorPath, EventPath = actor.EventPath, EventID = eventid, ParentEventID = parentEventid });
+                return result;
+            }
+            return null;
         }
 
         public IEventLogHandler EventLogHandler { get; set; }
+    }
+
+    public static class TaskExten
+    {
+
+        public static Task<T> ToTask<T>(this T result)
+        {
+            return Task.FromResult<T>(result);
+        }
     }
 }
