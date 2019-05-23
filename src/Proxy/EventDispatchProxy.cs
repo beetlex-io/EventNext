@@ -96,14 +96,13 @@ namespace EventNext.Proxy
                 {
                     if (EventCenter.EnabledLog(LogType.Debug))
                         EventCenter.Log(LogType.Debug, $"{input.Token} {Type.Name} proxy executing {input.EventPath}");
-                    EventCenter.InputNextQueue.Enqueue(inputWork, EventCenter.NextQueueWaits);
                 }
                 else
                 {
                     if (EventCenter.EnabledLog(LogType.Debug))
-                        EventCenter.Log(LogType.Debug, $"{input.Token} {Type.Name} proxy executing {input.EventPath} in {Type.Name}/{Actor} actor");
-                    ActorNextQueue.Enqueue(inputWork);
+                        EventCenter.Log(LogType.Debug, $"{input.Token} {Type.Name} proxy {Type.Name}/{Actor} actor executing {input.EventPath} ");
                 }
+                inputWork.Execute();
                 return task.GetTask();
             }
         }
@@ -111,7 +110,12 @@ namespace EventNext.Proxy
         protected void OnEventInvoke(IAnyCompletionSource e, IEventInput input, IEventOutput output)
         {
             ProxyOutputWork resultWork = new ProxyOutputWork { CompletionSource = e, EventCenter = EventCenter, Input = input, Output = output, EventDispatchProxy = this };
-            EventCenter.OutputNextQueue.Enqueue(resultWork,EventCenter.NextQueueWaits);
+            EventCenter.OutputNextQueue.Enqueue(resultWork, EventCenter.NextQueueWaits);
+        }
+
+        public override string ToString()
+        {
+            return $"/{Name}/{Actor}";
         }
 
         class ProxyOutputWork : IEventWork
@@ -158,7 +162,7 @@ namespace EventNext.Proxy
             }
         }
 
-        class ProxyInputWork : IEventWork
+        class ProxyInputWork
         {
             public EventCenter EventCenter { get; set; }
 
@@ -171,10 +175,9 @@ namespace EventNext.Proxy
             public void Dispose()
             {
 
-
             }
 
-            public async Task Execute()
+            public async void Execute()
             {
                 var result = await EventCenter.Execute(Input);
                 DispatchProxy.OnEventInvoke(CompletionSource, Input, result);

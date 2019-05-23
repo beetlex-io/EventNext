@@ -35,6 +35,19 @@ namespace EventNext
             Next().Enqueue(item);
         }
 
+        public NextQueue Next(int waitLength)
+        {
+            for (int i = 0; i < mQueues.Count; i++)
+            {
+                if (mQueues[i].Count < waitLength)
+                {
+                    return mQueues[i];
+
+                }
+            }
+            return Next();
+        }
+
         public NextQueue Next()
         {
             var index = System.Threading.Interlocked.Increment(ref mIndex);

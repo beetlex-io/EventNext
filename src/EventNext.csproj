@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFramework>netcoreapp2.1</TargetFramework>
     <Description>EventNext is logic interface design in event driven components  for .net core</Description>
-    <Version>0.3.6</Version>
+    <Version>0.5.2</Version>
     <Authors>henryfan</Authors>
     <Company>ikende.com</Company>
     <Copyright>Copyright © ikende.com 2019 email:henryfan@msn.com</Copyright>

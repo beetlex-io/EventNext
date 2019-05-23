@@ -45,7 +45,7 @@ namespace EventNext
             {
                 try
                 {
-                    actorState.Flush();
+                    actorState.ActorFlush();
                     if (center.EnabledLog(LogType.Debug))
                     {
                         center.Log(LogType.Debug, $"Free {item.ActorID}@{item.Interface.Name} actor flush success!");
@@ -100,6 +100,8 @@ namespace EventNext
             public string ActorID { get; set; }
 
             public long TimeOut { get; set; }
+
+            public NextQueue NextQueue { get; set; } = new NextQueue();
 
             public object Actor { get; set; }
 

@@ -4,19 +4,25 @@ using System.Text;
 
 namespace EventNext
 {
+    public interface IController
+    {
+        void Initialize(EventCenter center);
+    }
+
     public interface IActorState
     {
         string EventPath { get; set; }
 
         string ActorPath { get; set; }
 
-        void Init(string id);
-
         object Token { get; set; }
 
         EventCenter EventCenter { get; set; }
 
-        void Flush();
+        void ActorInit(string id);
+
+        void ActorFlush();
+
     }
 
     public abstract class ActorState : IActorState
@@ -29,12 +35,12 @@ namespace EventNext
 
         public EventCenter EventCenter { get; set; }
 
-        public virtual void Flush()
+        public virtual void ActorFlush()
         {
 
         }
 
-        public virtual void Init(string id)
+        public virtual void ActorInit(string id)
         {
 
         }

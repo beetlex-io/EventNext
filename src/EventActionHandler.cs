@@ -18,11 +18,27 @@ namespace EventNext
             PropertyInfo pi = method.ReturnType.GetProperty("Result", BindingFlags.Public | BindingFlags.Instance);
             if (pi != null)
                 ResultProperty = new PropertyHandler(pi);
+            ThreadInvokeAttribute thread = method.GetCustomAttribute<ThreadInvokeAttribute>();
+            if (thread != null)
+                ThreadType = thread.Type;
+            int i = 0;
             foreach (var p in method.GetParameters())
             {
+                if (p.GetCustomAttribute<ThreadUniqueID>() != null)
+                {
+                    if (p.ParameterType.IsValueType || p.ParameterType == typeof(string))
+                        ThreadUniqueID.Add(i);
+                }
                 Parameters.Add(new EventParameter(p));
+                i++;
             }
         }
+
+        public List<int> ThreadUniqueID { get; private set; } = new List<int>();
+
+        private NextQueue mDefaultQueue = new NextQueue();
+
+        public ThreadType ThreadType { get; set; } = ThreadType.None;
 
         public bool SingleInstance { get; set; } = true;
 
@@ -69,6 +85,32 @@ namespace EventNext
         }
 
         internal ActorCollection Actors { get; set; }
+
+        private Dictionary<string, NextQueue> mNextQueues = new Dictionary<string, NextQueue>();
+
+        public NextQueue GetNextQueue(object[] data)
+        {
+            if (ThreadUniqueID.Count == 0)
+                return mDefaultQueue;
+            else
+            {
+
+                string key = "";
+                for (int i = 0; i < ThreadUniqueID.Count; i++)
+                {
+                    key += data[ThreadUniqueID[i]].ToString();
+                }
+                lock (mNextQueues)
+                {
+                    if (!mNextQueues.TryGetValue(key, out NextQueue value))
+                    {
+                        value = new NextQueue();
+                        mNextQueues[key] = value;
+                    }
+                    return value;
+                }
+            }
+        }
 
     }
 }

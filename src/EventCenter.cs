@@ -23,7 +23,7 @@ namespace EventNext
 
         public EventCenter()
         {
-            LogType = LogType.Error;
+            LogLevel = LogType.Error;
             ActorFreeTime = 60;
             mFreeTimer = new System.Threading.Timer(OnFreeActor, null, 1000 * 30, 1000 * 30);
         }
@@ -42,13 +42,17 @@ namespace EventNext
 
         protected virtual object CreateController(Type type)
         {
+            object result;
             if (ServiceInstance != null)
             {
                 Events.EventServiceInstanceArgs e = new Events.EventServiceInstanceArgs(this, type);
                 ServiceInstance(this, e);
-                return e.Service ?? Activator.CreateInstance(type);
+                result = e.Service ?? Activator.CreateInstance(type);
             }
-            return Activator.CreateInstance(type);
+            result = Activator.CreateInstance(type);
+            if (result is IController controller)
+                controller.Initialize(this);
+            return result;
         }
 
         private void OnFreeActor(object state)
@@ -85,7 +89,7 @@ namespace EventNext
 
         public static System.Diagnostics.Stopwatch Watch { get; private set; }
 
-        public LogType LogType { get; set; }
+        public LogType LogLevel { get; set; }
 
         public int ActorFreeTime { get; set; }
 
@@ -93,7 +97,7 @@ namespace EventNext
 
         public bool EnabledLog(LogType type)
         {
-            return (this.LogType & type) > 0;
+            return (int)(this.LogLevel) <= (int)type;
         }
 
         public void Log(LogType logType, string message)
@@ -158,7 +162,14 @@ namespace EventNext
                                 handler.Actors = serviceCollection;
                                 handler.Interface = itype;
                                 mActionHadlers[actionUrl] = handler;
-                                Log(LogType.Info, $"Register {itype.Name}->{type.Name}@{method.Name} to {actionUrl}");
+                                string threadUniqueID = "";
+                                foreach (var index in handler.ThreadUniqueID)
+                                {
+                                    if (!string.IsNullOrEmpty(threadUniqueID))
+                                        threadUniqueID += ".";
+                                    threadUniqueID += handler.Parameters[index].ParameterInfo.Name;
+                                }
+                                Log(LogType.Info, $"Register {itype.Name}->{type.Name}@{method.Name} to {actionUrl}[ThreadType:{handler.ThreadType}|UniqueID:{threadUniqueID}]");
                             }
                         }
                         else
@@ -266,13 +277,19 @@ namespace EventNext
                     var actorID = input.Properties?[ACTOR_TAG];
                     string actorPath = null;
                     object controller = null;
+                    NextQueue nextQueue = null;
                     if (string.IsNullOrEmpty(actorID))
                     {
+                        nextQueue = this.InputNextQueue.Next(this.NextQueueWaits);
                         if (EnabledLog(LogType.Debug))
                         {
                             Log(LogType.Debug, $"{input.Token} Process event '{input.EventPath}'");
                         }
                         controller = handler.Controller;
+                        if (handler.ThreadType == ThreadType.OneQueue)
+                        {
+                            nextQueue = handler.GetNextQueue(input.Data);
+                        }
                         if (!handler.SingleInstance)
                         {
                             controller = CreateController(handler.ControllerType);
@@ -301,7 +318,7 @@ namespace EventNext
                                 state.EventCenter = this;
                                 state.EventPath = input.EventPath;
                                 state.Token = input.Token;
-                                state.Init(actorID);
+                                state.ActorInit(actorID);
                                 if (EnabledLog(LogType.Debug))
                                     Log(LogType.Debug, $"{input.Token} {handler.ControllerType.Name}@{actorPath} actor initialized");
                             }
@@ -316,9 +333,10 @@ namespace EventNext
                                 state.Token = input.Token;
                             }
                         }
+                        nextQueue = item.NextQueue;
                     }
-                    EventActionHandlerContext context = new EventActionHandlerContext(this, input, handler, controller);
-                    var result = await context.Execute();
+                    EventActionHandlerContext context = new EventActionHandlerContext(this, input, handler, controller, nextQueue);
+                    var result = await context.Invoke();
                     if (result != null)
                         output.Data = new object[] { result };
                     if (EnabledLog(LogType.Debug))

@@ -30,7 +30,8 @@ namespace EventNext
             {
                 if (!_doingWork)
                 {
-                    System.Threading.ThreadPool.QueueUserWorkItem((o) => OnStart());
+                    //System.Threading.ThreadPool.QueueUserWorkItem((o) => OnStart());
+                    Task.Run(() => OnStart());
                     _doingWork = true;
                 }
             }
