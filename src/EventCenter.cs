@@ -309,7 +309,7 @@ namespace EventNext
                     Log(LogType.Debug, $"{input.Token} Process event {input.EventPath}");
                 }
                 controller = handler.Controller;
-                if (handler.ThreadType == ThreadType.OneQueue)
+                if (handler.ThreadType == ThreadType.SingleQueue)
                 {
                     nextQueue = handler.GetNextQueue(input.Data);
                 }

@@ -19,7 +19,7 @@ namespace EventNext
     {
         None,
         ThreadPool,
-        OneQueue
+        SingleQueue
     }
 
     [AttributeUsage(AttributeTargets.Parameter)]
