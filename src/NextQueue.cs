@@ -10,6 +10,7 @@ namespace EventNext
         public NextQueue()
         {
             mQueue = new System.Collections.Concurrent.ConcurrentQueue<IEventWork>();
+          
         }
 
         private readonly object _workSync = new object();
@@ -30,8 +31,8 @@ namespace EventNext
             {
                 if (!_doingWork)
                 {
-                    //System.Threading.ThreadPool.QueueUserWorkItem((o) => OnStart());
-                    Task.Run(() => OnStart());
+                    System.Threading.ThreadPool.QueueUserWorkItem(OnStart);
+                    //Task.Run(() => OnStart());
                     _doingWork = true;
                 }
             }
@@ -49,9 +50,9 @@ namespace EventNext
             }
         }
 
-        public Action<Exception, IEventWork> Error { get; set; }
+        public static Action<Exception, IEventWork> Error { get; set; }
 
-        private async void OnStart()
+        private async void OnStart(object state)
         {
             while (true)
             {

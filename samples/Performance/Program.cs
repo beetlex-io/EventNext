@@ -86,23 +86,19 @@ namespace Performance
     }
 
     [Service(typeof(IUserService))]
-    public class UserService : IUserService, IActorState
+    public class UserService : ActorState,IUserService
     {
         private int mAmount;
 
-        public string Path { get; set; }
 
-        public EventCenter EventCenter { get; set; }
 
         public Task<int> Amount()
         {
             return Task.FromResult(mAmount);
         }
 
-        public void Flush()
-        {
 
-        }
+
 
         public Task<int> Income(int value)
         {
@@ -110,10 +106,7 @@ namespace Performance
             return Task.FromResult(mAmount);
         }
 
-        public void Init()
-        {
-            Console.WriteLine($"{Path} init");
-        }
+
 
         public Task<int> Payout(int value)
         {

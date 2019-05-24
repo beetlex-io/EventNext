@@ -104,8 +104,8 @@ namespace EventNext_AkkaNet
             var get = new Get();
             var henryAmount = await henryActor.Ask<decimal>(get);
             var nbAmount = await nbActor.Ask<decimal>(get);
-            long usetime = EventCenter.Watch.ElapsedMilliseconds - start;
-            Console.WriteLine($"Akka concurrent{concurrent}|use time:{EventCenter.Watch.ElapsedMilliseconds - start}|count:{mCount}|rps:{mCount / usetime * 1000}|henry:{henryAmount}|nb:{nbAmount}");
+            double usetime = EventCenter.Watch.ElapsedMilliseconds - start;
+            Console.WriteLine($"Akka concurrent{concurrent}|use time:{EventCenter.Watch.ElapsedMilliseconds - start}|count:{mCount}|rps:{(mCount / usetime * 1000):####}|henry:{henryAmount}|nb:{nbAmount}");
         }
 
         static async Task EventNextTest(int concurrent)
@@ -163,8 +163,8 @@ namespace EventNext_AkkaNet
             Task.WaitAll(tasks.ToArray());
             var henryAmount = await henry.Amount();
             var nbAmount = await nb.Amount();
-            long usetime = EventCenter.Watch.ElapsedMilliseconds - start;
-            Console.WriteLine($"EventNext concurrent{concurrent} use time:{usetime}|count:{mCount}|rps:{mCount / usetime * 1000}|henry:{henryAmount}|nb:{nbAmount}");
+            double usetime = EventCenter.Watch.ElapsedMilliseconds - start;
+            Console.WriteLine($"EventNext concurrent{concurrent} use time:{usetime}|count:{mCount}|rps:{(mCount / usetime * 1000):####}|henry:{henryAmount}|nb:{nbAmount}");
         }
     }
 }

@@ -162,7 +162,7 @@ namespace EventNext.Proxy
             }
         }
 
-        class ProxyInputWork
+        class ProxyInputWork : IEventCompleted
         {
             public EventCenter EventCenter { get; set; }
 
@@ -172,15 +172,19 @@ namespace EventNext.Proxy
 
             public EventDispatchProxy DispatchProxy { get; set; }
 
+            public void Completed(IEventOutput data)
+            {
+                DispatchProxy.OnEventInvoke(CompletionSource, Input, data);
+            }
+
             public void Dispose()
             {
 
             }
 
-            public async void Execute()
+            public void Execute()
             {
-                var result = await EventCenter.Execute(Input);
-                DispatchProxy.OnEventInvoke(CompletionSource, Input, result);
+                EventCenter.Execute(Input, this);
             }
         }
 

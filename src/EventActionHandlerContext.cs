@@ -5,20 +5,18 @@ using System.Threading.Tasks;
 
 namespace EventNext
 {
-    public class EventActionHandlerContext : IEventWork
+    class EventActionHandlerContext : IEventWork
     {
 
         public EventActionHandlerContext(EventCenter server, IEventInput input, EventActionHandler handler, object controller, NextQueue nextQueue)
         {
             Input = input;
-            Server = server;
+            EventCenter = server;
             Handler = handler;
             Controller = controller;
             NextQueue = nextQueue;
 
         }
-
-        private TaskCompletionSource<object> mThreadTaskCompletionSource;
 
         public NextQueue NextQueue { get; private set; }
 
@@ -26,13 +24,17 @@ namespace EventNext
 
         public EventActionHandler Handler { get; private set; }
 
-        public EventCenter Server
+        public EventCenter EventCenter
         {
             get; private set;
         }
 
         public IEventInput Input
         { get; private set; }
+
+        private EventOutput mEventOutput;
+
+        private IEventCompleted mEventCompleted;
 
         public async Task Execute()
         {
@@ -44,18 +46,28 @@ namespace EventNext
                     await task;
                 }
                 object data = Handler.GetResult(result);
-                mThreadTaskCompletionSource.TrySetResult(data);
+                mEventOutput.EventError = EventError.Success;
+                if (data != null)
+                    mEventOutput.Data = new object[] { data };
             }
             catch (Exception e_)
             {
-                mThreadTaskCompletionSource.TrySetException(e_);
+                mEventOutput.EventError = EventError.InnerError;
+                mEventOutput.Data = new object[] { $"Process event {Input.EventPath} error {e_.Message}" };
+                if (EventCenter.EnabledLog(LogType.Error))
+                    EventCenter.Log(LogType.Error, $"{Input.Token} process event {Input.EventPath} error {e_.Message}@{e_.StackTrace}");
+            }
+            finally
+            {
+                mEventCompleted.Completed(mEventOutput);
             }
         }
 
-        public Task<object> Invoke()
+        public void Execute(EventOutput eventOutput, IEventCompleted completed)
         {
+            mEventOutput = eventOutput;
+            mEventCompleted = completed;
             ThreadType threadType = Handler.ThreadType;
-            mThreadTaskCompletionSource = new TaskCompletionSource<object>();
             if (threadType == ThreadType.ThreadPool)
             {
                 System.Threading.ThreadPool.QueueUserWorkItem(async (d) => await Execute());
@@ -64,7 +76,6 @@ namespace EventNext
             {
                 NextQueue.Enqueue(this);
             }
-            return mThreadTaskCompletionSource.Task;
         }
 
         public void Dispose()

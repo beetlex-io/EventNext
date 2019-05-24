@@ -6,7 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="EventNext" Version="0.2.2" />
+    <PackageReference Include="EventNext" Version="0.5.6" />
   </ItemGroup>
 
 </Project>

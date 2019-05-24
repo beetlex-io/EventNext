@@ -251,112 +251,119 @@ namespace EventNext
             return handler;
         }
 
-        public async Task<IEventOutput> Execute(IEventInput input)
+        public Task<IEventOutput> Execute(IEventInput input)
+        {
+            EventCompleted eventCompleted = new EventCompleted();
+            Execute(input, eventCompleted);
+            return eventCompleted.GetTask();
+        }
+
+        public void Execute(IEventInput input, IEventCompleted callBackEvent)
         {
             if (input.ID == 0)
                 input.ID = GetInputID();
-            double runTime = Watch.Elapsed.TotalMilliseconds;
             EventOutput output = new EventOutput();
             output.Token = input.Token;
             output.ID = input.ID;
-            try
+            output.EventError = EventError.Success;
+            EventActionHandler handler = GetActionHandler(input.EventPath);
+            if (handler == null)
             {
-                output.EventError = EventError.Success;
-                EventActionHandler handler = GetActionHandler(input.EventPath);
-                if (handler == null)
+                output.EventError = EventError.NotFound;
+                output.Data = new object[] { $"Process event error {input.EventPath} not found!" };
+                if (EnabledLog(LogType.Warring))
                 {
-                    output.EventError = EventError.NotFound;
-                    output.Data = new object[] { $"Process event error '{input.EventPath}' not found!" };
-                    if (EnabledLog(LogType.Warring))
+                    Log(LogType.Warring, $"{input.Token} Process event error {input.EventPath} not found!");
+                }
+                callBackEvent.Completed(output);
+            }
+            else
+            {
+                try
+                {
+                    OnExecute(input, output, handler, callBackEvent);
+                }
+                catch (Exception e_)
+                {
+                    output.EventError = EventError.InnerError;
+                    output.Data = new object[] { $"Process event {input.EventPath} error {e_.Message}" };
+                    if (EnabledLog(LogType.Error))
+                        Log(LogType.Error, $"{input.Token} process event {input.EventPath} error {e_.Message}@{e_.StackTrace}");
+                    callBackEvent.Completed(output);
+                }
+            }
+
+        }
+
+        private void OnExecute(IEventInput input, EventOutput output, EventActionHandler handler, IEventCompleted callBackEvent)
+        {
+            var actorID = input.Properties?[ACTOR_TAG];
+            string actorPath = null;
+            object controller = null;
+            NextQueue nextQueue = null;
+            if (string.IsNullOrEmpty(actorID))
+            {
+                nextQueue = this.InputNextQueue.Next(this.NextQueueWaits);
+                if (EnabledLog(LogType.Debug))
+                {
+                    Log(LogType.Debug, $"{input.Token} Process event {input.EventPath}");
+                }
+                controller = handler.Controller;
+                if (handler.ThreadType == ThreadType.OneQueue)
+                {
+                    nextQueue = handler.GetNextQueue(input.Data);
+                }
+                if (!handler.SingleInstance)
+                {
+                    controller = CreateController(handler.ControllerType);
+                }
+            }
+            else
+            {
+                ActorCollection.ActorCollectionItem item;
+                item = handler.Actors.Get(actorID);
+                if (item == null)
+                {
+                    actorPath = "/" + handler.ServiceName + "/" + actorID;
+                    if (EnabledLog(LogType.Debug))
+                        Log(LogType.Debug, $"{input.Token} {handler.ControllerType.Name}@{actorPath} create actor");
+                    item = new ActorCollection.ActorCollectionItem();
+                    item.ActorID = actorID;
+                    item.Actor = CreateController(handler.Actors.ServiceType);
+                    item.ServiceName = handler.ServiceName;
+                    item.Interface = handler.Interface;
+                    item = handler.Actors.Set(actorID, item);
+                    item.TimeOut = EventCenter.Watch.ElapsedMilliseconds + ActorFreeTime * 1000;
+                    controller = item.Actor;
+                    if (controller is IActorState state)
                     {
-                        Log(LogType.Warring, $"{input.Token} Process event error '{input.EventPath}' not found!");
+                        state.ActorPath = actorPath;
+                        state.EventCenter = this;
+                        state.EventPath = input.EventPath;
+                        state.Token = input.Token;
+                        state.ActorInit(actorID);
+                        if (EnabledLog(LogType.Debug))
+                            Log(LogType.Debug, $"{input.Token} {handler.ControllerType.Name}@{actorPath} actor initialized");
                     }
                 }
                 else
                 {
-                    var actorID = input.Properties?[ACTOR_TAG];
-                    string actorPath = null;
-                    object controller = null;
-                    NextQueue nextQueue = null;
-                    if (string.IsNullOrEmpty(actorID))
+                    item.TimeOut = EventCenter.Watch.ElapsedMilliseconds + ActorFreeTime * 1000;
+                    controller = item.Actor;
+                    if (controller is IActorState state)
                     {
-                        nextQueue = this.InputNextQueue.Next(this.NextQueueWaits);
-                        if (EnabledLog(LogType.Debug))
-                        {
-                            Log(LogType.Debug, $"{input.Token} Process event '{input.EventPath}'");
-                        }
-                        controller = handler.Controller;
-                        if (handler.ThreadType == ThreadType.OneQueue)
-                        {
-                            nextQueue = handler.GetNextQueue(input.Data);
-                        }
-                        if (!handler.SingleInstance)
-                        {
-                            controller = CreateController(handler.ControllerType);
-                        }
-                    }
-                    else
-                    {
-                        ActorCollection.ActorCollectionItem item;
-                        item = handler.Actors.Get(actorID);
-                        if (item == null)
-                        {
-                            actorPath = "/" + handler.ServiceName + "/" + actorID;
-                            if (EnabledLog(LogType.Debug))
-                                Log(LogType.Debug, $"{input.Token} {handler.ControllerType.Name}@{actorPath} create actor");
-                            item = new ActorCollection.ActorCollectionItem();
-                            item.ActorID = actorID;
-                            item.Actor = CreateController(handler.Actors.ServiceType);
-                            item.ServiceName = handler.ServiceName;
-                            item.Interface = handler.Interface;
-                            item = handler.Actors.Set(actorID, item);
-                            item.TimeOut = EventCenter.Watch.ElapsedMilliseconds + ActorFreeTime * 1000;
-                            controller = item.Actor;
-                            if (controller is IActorState state)
-                            {
-                                state.ActorPath = actorPath;
-                                state.EventCenter = this;
-                                state.EventPath = input.EventPath;
-                                state.Token = input.Token;
-                                state.ActorInit(actorID);
-                                if (EnabledLog(LogType.Debug))
-                                    Log(LogType.Debug, $"{input.Token} {handler.ControllerType.Name}@{actorPath} actor initialized");
-                            }
-                        }
-                        else
-                        {
-                            item.TimeOut = EventCenter.Watch.ElapsedMilliseconds + ActorFreeTime * 1000;
-                            controller = item.Actor;
-                            if (controller is IActorState state)
-                            {
-                                state.EventPath = input.EventPath;
-                                state.Token = input.Token;
-                            }
-                        }
-                        nextQueue = item.NextQueue;
-                    }
-                    EventActionHandlerContext context = new EventActionHandlerContext(this, input, handler, controller, nextQueue);
-                    var result = await context.Invoke();
-                    if (result != null)
-                        output.Data = new object[] { result };
-                    if (EnabledLog(LogType.Debug))
-                    {
-                        if (string.IsNullOrEmpty(actorPath))
-                            Log(LogType.Debug, $"{input.Token} Process event {handler.ControllerType.Name}@{handler.ActionName} successed");
-                        else
-                            Log(LogType.Debug, $"{input.Token} Process event in {actorPath} actor invoke {handler.ControllerType.Name}/{handler.ActionName} successed");
+                        state.EventPath = input.EventPath;
+                        state.Token = input.Token;
                     }
                 }
+                nextQueue = item.NextQueue;
+                if (EnabledLog(LogType.Debug))
+                {
+                    Log(LogType.Debug, $"{input.Token} Process event {input.EventPath} in /{item.ServiceName}/{item.ActorID} actor");
+                }
             }
-            catch (Exception e_)
-            {
-                output.EventError = EventError.InnerError;
-                output.Data = new object[] { $"Process event {input.EventPath} error {e_.Message}" };
-                if (EnabledLog(LogType.Error))
-                    Log(LogType.Error, $"{input.Token} Process event {input.EventPath} error {e_.Message}@{e_.StackTrace}");
-            }
-            output.ResponseTime = Watch.Elapsed.TotalMilliseconds - runTime;
-            return output;
+            EventActionHandlerContext context = new EventActionHandlerContext(this, input, handler, controller, nextQueue);
+            context.Execute(output, callBackEvent);
         }
 
         private ActorProxyCollection GetActorProxy(Type type)
