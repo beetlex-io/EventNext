@@ -39,13 +39,13 @@ namespace EventNext
 
         public Type ServiceType { get; private set; }
 
-        private void OnFlush(EventCenter center, ActorCollectionItem item)
+        private async void OnFlush(EventCenter center, ActorCollectionItem item)
         {
             if (item.Actor is IActorState actorState)
             {
                 try
                 {
-                    actorState.ActorFlush();
+                    await actorState.ActorFlush();
                     if (center.EnabledLog(LogType.Debug))
                     {
                         center.Log(LogType.Debug, $"Free {item.ActorID}@{item.Interface.Name} actor flush success!");

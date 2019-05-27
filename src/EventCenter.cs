@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
@@ -126,10 +127,15 @@ namespace EventNext
                 }
                 string serviceName = (attribute.Name ?? itype.Name);
                 string url = "/" + serviceName + "/";
-                foreach (MethodInfo method in type.GetMethods(BindingFlags.Public | BindingFlags.Instance))
+                foreach (MethodInfo imethod in itype.GetMethods(BindingFlags.Public | BindingFlags.Instance))
                 {
                     try
                     {
+                        Type[] parameterTypes = (from a in imethod.GetParameters() select a.ParameterType).ToArray();
+                        MethodInfo method = type.GetMethod(imethod.Name, parameterTypes);
+                        if (method == null)
+                            continue;
+
                         if (string.Compare("Equals", method.Name, true) == 0
                       || string.Compare("GetHashCode", method.Name, true) == 0
                       || string.Compare("GetType", method.Name, true) == 0
@@ -169,17 +175,17 @@ namespace EventNext
                                         threadUniqueID += ".";
                                     threadUniqueID += handler.Parameters[index].ParameterInfo.Name;
                                 }
-                                Log(LogType.Info, $"Register {itype.Name}->{type.Name}@{method.Name} to {actionUrl}[ThreadType:{handler.ThreadType}|UniqueID:{threadUniqueID}]");
+                                Log(LogType.Info, $"Register {itype.Name}->{type.Name}@{imethod.Name} to {actionUrl}[ThreadType:{handler.ThreadType}|UniqueID:{threadUniqueID}]");
                             }
                         }
                         else
                         {
-                            Log(LogType.Error, $"Register {itype.Name}->{type.Name}.{method.Name} error, method result type not a Task!");
+                            Log(LogType.Error, $"Register {itype.Name}->{type.Name}.{imethod.Name} error, method result type not a Task!");
                         }
                     }
                     catch (Exception e_)
                     {
-                        Log(LogType.Error, $"Register {itype.Name}->{type.Name}@{method.Name} action error {e_.Message}@{e_.StackTrace}");
+                        Log(LogType.Error, $"Register {itype.Name}->{type.Name}@{imethod.Name} action error {e_.Message}@{e_.StackTrace}");
                     }
                 }
             }
@@ -279,91 +285,91 @@ namespace EventNext
             }
             else
             {
-                try
-                {
-                    OnExecute(input, output, handler, callBackEvent);
-                }
-                catch (Exception e_)
-                {
-                    output.EventError = EventError.InnerError;
-                    output.Data = new object[] { $"Process event {input.EventPath} error {e_.Message}" };
-                    if (EnabledLog(LogType.Error))
-                        Log(LogType.Error, $"{input.Token} process event {input.EventPath} error {e_.Message}@{e_.StackTrace}");
-                    callBackEvent.Completed(output);
-                }
+                OnExecute(input, output, handler, callBackEvent);
             }
 
         }
 
-        private void OnExecute(IEventInput input, EventOutput output, EventActionHandler handler, IEventCompleted callBackEvent)
+        private async void OnExecute(IEventInput input, EventOutput output, EventActionHandler handler, IEventCompleted callBackEvent)
         {
-            var actorID = input.Properties?[ACTOR_TAG];
-            string actorPath = null;
-            object controller = null;
-            NextQueue nextQueue = null;
-            if (string.IsNullOrEmpty(actorID))
+            try
             {
-                nextQueue = this.InputNextQueue.Next(this.NextQueueWaits);
-                if (EnabledLog(LogType.Debug))
+                var actorID = input.Properties?[ACTOR_TAG];
+                string actorPath = null;
+                object controller = null;
+                NextQueue nextQueue = null;
+                if (string.IsNullOrEmpty(actorID))
                 {
-                    Log(LogType.Debug, $"{input.Token} Process event {input.EventPath}");
-                }
-                controller = handler.Controller;
-                if (handler.ThreadType == ThreadType.SingleQueue)
-                {
-                    nextQueue = handler.GetNextQueue(input.Data);
-                }
-                if (!handler.SingleInstance)
-                {
-                    controller = CreateController(handler.ControllerType);
-                }
-            }
-            else
-            {
-                ActorCollection.ActorCollectionItem item;
-                item = handler.Actors.Get(actorID);
-                if (item == null)
-                {
-                    actorPath = "/" + handler.ServiceName + "/" + actorID;
+                    nextQueue = this.InputNextQueue.Next(this.NextQueueWaits);
                     if (EnabledLog(LogType.Debug))
-                        Log(LogType.Debug, $"{input.Token} {handler.ControllerType.Name}@{actorPath} create actor");
-                    item = new ActorCollection.ActorCollectionItem();
-                    item.ActorID = actorID;
-                    item.Actor = CreateController(handler.Actors.ServiceType);
-                    item.ServiceName = handler.ServiceName;
-                    item.Interface = handler.Interface;
-                    item = handler.Actors.Set(actorID, item);
-                    item.TimeOut = EventCenter.Watch.ElapsedMilliseconds + ActorFreeTime * 1000;
-                    controller = item.Actor;
-                    if (controller is IActorState state)
                     {
-                        state.ActorPath = actorPath;
-                        state.EventCenter = this;
-                        state.EventPath = input.EventPath;
-                        state.Token = input.Token;
-                        state.ActorInit(actorID);
-                        if (EnabledLog(LogType.Debug))
-                            Log(LogType.Debug, $"{input.Token} {handler.ControllerType.Name}@{actorPath} actor initialized");
+                        Log(LogType.Debug, $"{input.Token} Process event {input.EventPath}");
+                    }
+                    controller = handler.Controller;
+                    if (handler.ThreadType == ThreadType.SingleQueue)
+                    {
+                        nextQueue = handler.GetNextQueue(input.Data);
+                    }
+                    if (!handler.SingleInstance)
+                    {
+                        controller = CreateController(handler.ControllerType);
                     }
                 }
                 else
                 {
-                    item.TimeOut = EventCenter.Watch.ElapsedMilliseconds + ActorFreeTime * 1000;
-                    controller = item.Actor;
-                    if (controller is IActorState state)
+                    ActorCollection.ActorCollectionItem item;
+                    item = handler.Actors.Get(actorID);
+                    if (item == null)
                     {
-                        state.EventPath = input.EventPath;
-                        state.Token = input.Token;
+                        actorPath = "/" + handler.ServiceName + "/" + actorID;
+                        if (EnabledLog(LogType.Debug))
+                            Log(LogType.Debug, $"{input.Token} {handler.ControllerType.Name}@{actorPath} create actor");
+                        item = new ActorCollection.ActorCollectionItem();
+                        item.ActorID = actorID;
+                        item.Actor = CreateController(handler.Actors.ServiceType);
+                        item.ServiceName = handler.ServiceName;
+                        item.Interface = handler.Interface;
+                        item.TimeOut = EventCenter.Watch.ElapsedMilliseconds + ActorFreeTime * 1000;  
+                        if (controller is IActorState state)
+                        {
+                            state.ActorPath = actorPath;
+                            state.EventCenter = this;
+                            state.EventPath = input.EventPath;
+                            state.Token = input.Token;
+                            await state.ActorInit(actorID);
+                            if (EnabledLog(LogType.Debug))
+                                Log(LogType.Debug, $"{input.Token} {handler.ControllerType.Name}@{actorPath} actor initialized");
+                        }
+                        item = handler.Actors.Set(actorID, item);
+                        controller = item.Actor;
+                    }
+                    else
+                    {
+                        item.TimeOut = EventCenter.Watch.ElapsedMilliseconds + ActorFreeTime * 1000;
+                        controller = item.Actor;
+                        if (controller is IActorState state)
+                        {
+                            state.EventPath = input.EventPath;
+                            state.Token = input.Token;
+                        }
+                    }
+                    nextQueue = item.NextQueue;
+                    if (EnabledLog(LogType.Debug))
+                    {
+                        Log(LogType.Debug, $"{input.Token} Process event {input.EventPath} in /{item.ServiceName}/{item.ActorID} actor");
                     }
                 }
-                nextQueue = item.NextQueue;
-                if (EnabledLog(LogType.Debug))
-                {
-                    Log(LogType.Debug, $"{input.Token} Process event {input.EventPath} in /{item.ServiceName}/{item.ActorID} actor");
-                }
+                EventActionHandlerContext context = new EventActionHandlerContext(this, input, handler, controller, nextQueue);
+                context.Execute(output, callBackEvent);
             }
-            EventActionHandlerContext context = new EventActionHandlerContext(this, input, handler, controller, nextQueue);
-            context.Execute(output, callBackEvent);
+            catch (Exception e_)
+            {
+                output.EventError = EventError.InnerError;
+                output.Data = new object[] { $"Process event {input.EventPath} error {e_.Message}" };
+                if (EnabledLog(LogType.Error))
+                    Log(LogType.Error, $"{input.Token} process event {input.EventPath} error {e_.Message}@{e_.StackTrace}");
+                callBackEvent.Completed(output);
+            }
         }
 
         private ActorProxyCollection GetActorProxy(Type type)

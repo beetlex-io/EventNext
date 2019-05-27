@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace EventNext
 {
@@ -19,9 +20,9 @@ namespace EventNext
 
         EventCenter EventCenter { get; set; }
 
-        void ActorInit(string id);
+        Task ActorInit(string id);
 
-        void ActorFlush();
+        Task ActorFlush();
 
     }
 
@@ -35,14 +36,14 @@ namespace EventNext
 
         public EventCenter EventCenter { get; set; }
 
-        public virtual void ActorFlush()
+        public virtual Task ActorFlush()
         {
-
+            return Task.CompletedTask;
         }
 
-        public virtual void ActorInit(string id)
+        public virtual Task ActorInit(string id)
         {
-
+            return Task.CompletedTask;
         }
     }
 
