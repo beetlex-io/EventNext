@@ -25,8 +25,8 @@ namespace EventNext
         public EventCenter()
         {
             LogLevel = LogType.Error;
-            ActorFreeTime = 60;
-            mFreeTimer = new System.Threading.Timer(OnFreeActor, null, 1000 * 30, 1000 * 30);
+            ActorFreeTime = 30;
+            mFreeTimer = new System.Threading.Timer(OnFreeActor, null, 1000 * 14, 1000 * 14);
         }
 
         private long mID = 0;
@@ -50,7 +50,10 @@ namespace EventNext
                 ServiceInstance(this, e);
                 result = e.Service ?? Activator.CreateInstance(type);
             }
-            result = Activator.CreateInstance(type);
+            else
+            {
+                result = Activator.CreateInstance(type);
+            }
             if (result is IController controller)
                 controller.Initialize(this);
             return result;
@@ -113,6 +116,24 @@ namespace EventNext
             }
         }
 
+        private ActionFilterAttribute[] GetFilters(Type type,string method,params Type[] parameters)
+        {
+            List<ActionFilterAttribute> filters = new List<ActionFilterAttribute>();
+            filters.AddRange(type.GetCustomAttributes<ActionFilterAttribute>(false));
+            var m = type.GetMethod(method, parameters);
+            var result= m?.GetCustomAttributes<ActionFilterAttribute>(false).ToArray();
+            if (result != null)
+            {
+                filters.AddRange(result);
+            }
+            var skip = m?.GetCustomAttribute<SkipActionFilterAttribute>(false);
+            if(skip !=null && skip.Types !=null)
+            {
+                filters.RemoveAll(f => skip.Types.Contains(f.GetType()));
+            }
+            return filters.ToArray();
+        }
+
         private void OnRegister(ServiceAttribute attribute, Type type, object controller)
         {
             foreach (Type itype in attribute.Types)
@@ -148,12 +169,11 @@ namespace EventNext
                             Type serviceType = controller.GetType();
                             if (!mActorsCollection.TryGetValue(serviceType, out ActorCollection serviceCollection))
                             {
-                                serviceCollection = new ActorCollection(serviceType);
+                                serviceCollection = new ActorCollection(serviceType, itype, serviceName);
                                 mActorsCollection[serviceType] = serviceCollection;
                                 mActorsCollection[itype] = serviceCollection;
                             }
                             ActionAttribute aa = method.GetCustomAttribute<ActionAttribute>(false);
-
                             var actionUrl = url + (aa == null ? method.Name : aa.Name);
                             if (mActionHadlers.TryGetValue(actionUrl, out EventActionHandler handler))
                             {
@@ -163,6 +183,7 @@ namespace EventNext
                             {
                                 handler = new EventActionHandler(type, method, controller);
                                 handler.ServiceName = serviceName;
+                                handler.Filters = GetFilters(type, imethod.Name, (from a in imethod.GetParameters() select a.ParameterType).ToArray());
                                 handler.ActionName = (aa == null ? method.Name : aa.Name);
                                 handler.SingleInstance = attribute.SingleInstance;
                                 handler.Actors = serviceCollection;
@@ -279,7 +300,7 @@ namespace EventNext
                 output.Data = new object[] { $"Process event error {input.EventPath} not found!" };
                 if (EnabledLog(LogType.Warring))
                 {
-                    Log(LogType.Warring, $"{input.Token} Process event error {input.EventPath} not found!");
+                    Log(LogType.Warring, $"[{input.ID}]{input.Token} Process event error {input.EventPath} not found!");
                 }
                 callBackEvent.Completed(output);
             }
@@ -294,16 +315,18 @@ namespace EventNext
         {
             try
             {
-                var actorID = input.Properties?[ACTOR_TAG];
+                string actorID = null;
+                input.Properties?.TryGetValue(ACTOR_TAG,out actorID);
                 string actorPath = null;
                 object controller = null;
                 NextQueue nextQueue = null;
+                ActorCollection.ActorItem item = null;
                 if (string.IsNullOrEmpty(actorID))
                 {
                     nextQueue = this.InputNextQueue.Next(this.NextQueueWaits);
                     if (EnabledLog(LogType.Debug))
                     {
-                        Log(LogType.Debug, $"{input.Token} Process event {input.EventPath}");
+                        Log(LogType.Debug, $"[{input.ID}]{input.Token} Process event {input.EventPath}");
                     }
                     controller = handler.Controller;
                     if (handler.ThreadType == ThreadType.SingleQueue)
@@ -317,49 +340,42 @@ namespace EventNext
                 }
                 else
                 {
-                    ActorCollection.ActorCollectionItem item;
                     item = handler.Actors.Get(actorID);
                     if (item == null)
                     {
                         actorPath = "/" + handler.ServiceName + "/" + actorID;
                         if (EnabledLog(LogType.Debug))
-                            Log(LogType.Debug, $"{input.Token} {handler.ControllerType.Name}@{actorPath} create actor");
-                        item = new ActorCollection.ActorCollectionItem();
+                            Log(LogType.Debug, $"[{input.ID}]{input.Token} {handler.ControllerType.Name}@{actorPath} create actor");
+                        item = new ActorCollection.ActorItem();
                         item.ActorID = actorID;
                         item.Actor = CreateController(handler.Actors.ServiceType);
                         item.ServiceName = handler.ServiceName;
                         item.Interface = handler.Interface;
-                        item.TimeOut = EventCenter.Watch.ElapsedMilliseconds + ActorFreeTime * 1000;  
+                        item.TimeOut = EventCenter.Watch.ElapsedMilliseconds + ActorFreeTime * 1000;
+                        item = handler.Actors.Set(actorID, item, out bool add);
+                        controller = item.Actor;
                         if (controller is IActorState state)
                         {
+                            state.ActorID = actorID;
                             state.ActorPath = actorPath;
                             state.EventCenter = this;
-                            state.EventPath = input.EventPath;
-                            state.Token = input.Token;
-                            await state.ActorInit(actorID);
                             if (EnabledLog(LogType.Debug))
-                                Log(LogType.Debug, $"{input.Token} {handler.ControllerType.Name}@{actorPath} actor initialized");
+                                Log(LogType.Debug, $"[{input.ID}]{input.Token} {handler.ControllerType.Name}@{actorPath} actor initialized");
                         }
-                        item = handler.Actors.Set(actorID, item);
-                        controller = item.Actor;
                     }
                     else
                     {
                         item.TimeOut = EventCenter.Watch.ElapsedMilliseconds + ActorFreeTime * 1000;
                         controller = item.Actor;
-                        if (controller is IActorState state)
-                        {
-                            state.EventPath = input.EventPath;
-                            state.Token = input.Token;
-                        }
                     }
                     nextQueue = item.NextQueue;
                     if (EnabledLog(LogType.Debug))
                     {
-                        Log(LogType.Debug, $"{input.Token} Process event {input.EventPath} in /{item.ServiceName}/{item.ActorID} actor");
+                        Log(LogType.Debug, $"[{input.ID}]{input.Token} Process event {input.EventPath} in /{item.ServiceName}/{item.ActorID} actor");
                     }
+                    await item.Initialize();
                 }
-                EventActionHandlerContext context = new EventActionHandlerContext(this, input, handler, controller, nextQueue);
+                EventActionHandlerContext context = new EventActionHandlerContext(this, input, handler, controller, nextQueue, item);
                 context.Execute(output, callBackEvent);
             }
             catch (Exception e_)
@@ -367,9 +383,41 @@ namespace EventNext
                 output.EventError = EventError.InnerError;
                 output.Data = new object[] { $"Process event {input.EventPath} error {e_.Message}" };
                 if (EnabledLog(LogType.Error))
-                    Log(LogType.Error, $"{input.Token} process event {input.EventPath} error {e_.Message}@{e_.StackTrace}");
+                    Log(LogType.Error, $"[{input.ID}]{input.Token} process event {input.EventPath} error {e_.Message}@{e_.StackTrace}");
                 callBackEvent.Completed(output);
             }
+        }
+
+        public async Task<object> GetActor<T>(string actorid)
+        {
+            object controller;
+            if (mActorsCollection.TryGetValue(typeof(T), out ActorCollection actors))
+            {
+                var item = actors.Get(actorid);
+                if (item == null)
+                {
+                    item = new ActorCollection.ActorItem();
+                    item.ActorID = actorid;
+                    item.Actor = CreateController(actors.ServiceType);
+                    item.ServiceName = actors.ServiceName;
+                    item.Interface = actors.InterfaceType;
+                    item.TimeOut = EventCenter.Watch.ElapsedMilliseconds + ActorFreeTime * 1000;
+                    item = actors.Set(actorid, item, out bool add);
+                    controller = item.Actor;
+                    await item.Initialize();
+                    string actorPath = $"/{actors.ServiceName}/{actorid}";
+                    if (controller is IActorState state)
+                    {
+                        state.ActorID = actorid;
+                        state.ActorPath = actorPath;
+                        state.EventCenter = this;
+                        if (EnabledLog(LogType.Debug))
+                            Log(LogType.Debug, $"{actors.ServiceType.Name}@{actorPath} actor initialized");
+                        return state;
+                    }
+                }
+            }
+            return null;
         }
 
         private ActorProxyCollection GetActorProxy(Type type)
@@ -450,6 +498,15 @@ namespace EventNext
             }
         }
 
+        [ThreadStatic]
+        private static IEventActionContext mEventActionContext;
+
+        public IEventActionContext EventActionContext
+        {
+            get { return mEventActionContext; }
+            internal set { mEventActionContext = value; }
+        }
+
         public void Dispose()
         {
             mActionHadlers.Clear();
@@ -463,23 +520,26 @@ namespace EventNext
                 mFreeTimer.Dispose();
         }
 
-        public Task<EventLog> ReadEvent(IActorState actor, string eventid)
+
+
+        public async Task<string> WriteEvent(IActorState actor, string eventid, string parentEventid, string type, object data)
         {
-            return EventLogHandler?.Read(actor, eventid);
+            if (actor == null)
+                throw new ENException("Actor cannot be null!");
+            if (EventStore == null)
+                throw new ENException("Event store cannot be null!");
+            if (eventid == null)
+                eventid = $"{actor.ActorPath}/{actor.Sequence}";
+            var result = await EventStore.Write(actor,
+                new EventStore { Sequence = actor.Sequence, Type = type, Data = data, DateTime = DateTime.Now, ActorPath = actor.ActorPath, EventPath = actor.EventPath, EventID = eventid, ParentEventID = parentEventid });
+            return result;
+
         }
 
-        public async Task<string> WriteEvent(IActorState actor, string eventid, string parentEventid, object data)
-        {
-            if (EventLogHandler != null)
-            {
-                var result = await EventLogHandler.Write(actor,
-                    new EventLog { Data = data, DateTime = DateTime.Now, ActorPath = actor.ActorPath, EventPath = actor.EventPath, EventID = eventid, ParentEventID = parentEventid });
-                return result;
-            }
-            return null;
-        }
+        public IEventStoreHandler EventStore { get; set; }
 
-        public IEventLogHandler EventLogHandler { get; set; }
+        public IList<IEventActionExecuteHandler> ExecuteHandlers { get; private set; } = new List<IEventActionExecuteHandler>();
+
     }
 
     public static class TaskExten

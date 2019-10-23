@@ -5,11 +5,20 @@ using System.Threading.Tasks;
 
 namespace EventNext
 {
-    public interface IEventLogHandler
+    public interface IEventStoreHandler
     {
-        Task<string> Write(IActorState actor, EventLog log);
+        Task Initialize(EventCenter eventCenter);
 
-        Task<EventLog> Read(IActorState actor, string eventid);
+        Task<string> Write(IActorState actor, EventStore log);
+
+        Task<EventStore> GetByEventID(IActorState actor, string eventid);
+        //
+        Task<EventStore> GetByParentEventID(IActorState actor, string parentEventid);
+
+        Task<IList<EventStore>> ListByParentEventID(IActorState actor, string parentEventid);
+
+        //用于获取最后事件，确保数据一致性
+        Task<EventStore> GetByTypeLast(IActorState actor, string type);
     }
 
 }

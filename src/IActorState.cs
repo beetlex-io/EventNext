@@ -12,6 +12,8 @@ namespace EventNext
 
     public interface IActorState
     {
+        string ActorID { get; set; }
+
         string EventPath { get; set; }
 
         string ActorPath { get; set; }
@@ -24,6 +26,8 @@ namespace EventNext
 
         Task ActorFlush();
 
+        long Sequence { get; set; }
+
     }
 
     public abstract class ActorState : IActorState
@@ -35,6 +39,10 @@ namespace EventNext
         public object Token { get; set; }
 
         public EventCenter EventCenter { get; set; }
+
+        public string ActorID { get; set; }
+
+        public long Sequence { get; set; }
 
         public virtual Task ActorFlush()
         {

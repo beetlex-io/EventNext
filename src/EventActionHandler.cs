@@ -36,6 +36,24 @@ namespace EventNext
 
         public List<int> ThreadUniqueID { get; private set; } = new List<int>();
 
+        private ConcurrentDictionary<string, object> mProperties = new ConcurrentDictionary<string, object>();
+
+
+        public ActionFilterAttribute[] Filters { get; internal set; }
+
+        public object this[string name]
+        {
+            get
+            {
+                mProperties.TryGetValue(name, out object value);
+                return value;
+            }
+            set
+            {
+                mProperties[name] = value;
+            }
+        }
+
         private NextQueue mDefaultQueue = new NextQueue();
 
         public ThreadType ThreadType { get; set; } = ThreadType.None;
@@ -111,6 +129,7 @@ namespace EventNext
                 }
             }
         }
+
 
     }
 }

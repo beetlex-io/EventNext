@@ -11,6 +11,7 @@ namespace EventNext
         InnerError = 500,
         TimeOut = 408,
         NotSupport = 403,
-        NotFound = 404
+        NotFound = 404,
+        DataError = 412
     }
 }

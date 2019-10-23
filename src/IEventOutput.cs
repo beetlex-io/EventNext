@@ -27,7 +27,7 @@ namespace EventNext
 
         public string EventPath { get; set; }
 
-        public Dictionary<string, string> Properties { get; set; }
+        public Dictionary<string, string> Properties { get; set; } = new Dictionary<string, string>();
 
         public object[] Data { get; set; }
 

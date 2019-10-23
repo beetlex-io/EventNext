@@ -7,13 +7,15 @@ using System.Threading.Tasks;
 
 namespace EventNext.Proxy
 {
-    public class EventDispatchProxy : DispatchProxy
+    public class EventDispatchProxy : DispatchProxy,IHeader
     {
         public EventDispatchProxy()
         {
         }
 
         private Dictionary<string, ActionHandlerProxy> mHandlers = new Dictionary<string, ActionHandlerProxy>();
+
+        private Dictionary<string, string> mHeader = new Dictionary<string, string>();
 
         public Type Type { get; internal set; }
 
@@ -34,6 +36,8 @@ namespace EventNext.Proxy
         public string Actor { get; internal set; }
 
         public string Name { get; internal set; }
+
+        public Dictionary<string, string> Header => mHeader;
 
         internal void InitHandlers()
         {
@@ -89,6 +93,15 @@ namespace EventNext.Proxy
                 {
                     input.Properties = new Dictionary<string, string>();
                     input.Properties[EventCenter.ACTOR_TAG] = this.Actor;
+                }
+                if(mHeader.Count>0)
+                {
+                    if (input.Properties == null)
+                        input.Properties = new Dictionary<string, string>();
+                    foreach(var item in mHeader)
+                    {
+                        input.Properties[item.Key] = item.Value;
+                    }
                 }
                 var task = handler.GetCompletionSource();
                 ProxyInputWork inputWork = new ProxyInputWork { CompletionSource = task, Input = input, EventCenter = EventCenter, DispatchProxy = this };
@@ -189,5 +202,9 @@ namespace EventNext.Proxy
         }
 
     }
+
+
+
+
 
 }
