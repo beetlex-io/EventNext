@@ -1,9 +1,9 @@
 # EventNext
 EventNext is logic interface design in event driven components  for .net core
-#### 0.5.9
-fix init actors error in multit thread
-#### 0.5.6
-Optimize queues， 20% performance improvement in 500 concurrent
+
+## samples
+https://github.com/IKende/BeetleX-Samples
+
 ## Install
 ```
 PM> Install-Package EventNext
